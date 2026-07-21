@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Social Feed Planner</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#E8E8E6;display:flex;align-items:flex-start;justify-content:center;min-height:100vh;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+:root{--sfbg:#F5F4F2;--sfsb:#FAFAF9;--sft1:#1A1A1A;--sft2:#6B7280;--sft3:#9CA3AF;--sfbr:rgba(0,0,0,0.08);--sfe:#F0EFEC}
+.dk{--sfbg:#111;--sfsb:#1A1A1A;--sft1:#F0F0F0;--sft2:#9CA3AF;--sft3:#6B7280;--sfbr:rgba(255,255,255,0.09);--sfe:#222}
+.sfp{display:flex;flex-direction:column;width:960px;height:720px;border-radius:14px;border:0.5px solid rgba(0,0,0,0.1);overflow:hidden;background:var(--sfbg);box-shadow:0 20px 60px rgba(0,0,0,0.18)}
+.sfp-tb{display:flex;align-items:center;justify-content:space-between;padding:0 14px;height:44px;background:var(--sfsb);border-bottom:0.5px solid var(--sfbr);flex-shrink:0}
+.sfp-body{display:flex;flex:1;overflow:hidden}
+.sf-lib{width:280px;min-width:280px;background:var(--sfsb);border-right:0.5px solid var(--sfbr);display:flex;flex-direction:column;overflow:hidden}
+.sf-pa{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.sf-pbar{display:flex;align-items:center;gap:5px;padding:0 12px;height:44px;border-bottom:0.5px solid var(--sfbr);overflow-x:auto;flex-shrink:0;scrollbar-width:none}
+.sf-pbar::-webkit-scrollbar{display:none}
+.sf-ps{flex:1;overflow:hidden;display:flex;align-items:flex-start;justify-content:center;padding:16px 0 0;background:radial-gradient(circle at 50% 30%,rgba(99,102,241,0.06) 0%,transparent 65%)}
+.phone-f{width:393px;background:#1C1C1C;border-radius:54px;padding:11px 9px;flex-shrink:0;box-shadow:0 0 0 1px rgba(255,255,255,0.1),0 0 0 2px rgba(255,255,255,0.04),0 24px 64px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.08)}
+.phone-sc{background:#fff;border-radius:47px;overflow:hidden;display:flex;flex-direction:column;height:793px;position:relative}
+.ph-sb{height:59px;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-bottom:0.5px solid #F2F2F2}
+.ph-di{width:126px;height:37px;background:#0A0A0A;border-radius:20px}
+.ph-is{flex:1;overflow-y:auto;scrollbar-width:none}
+.ph-is::-webkit-scrollbar{display:none}
+.ph-prof{background:#fff;padding:12px 16px 0;position:sticky;top:0;z-index:20}
+.ph-av{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#f093fb,#f5576c);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:700;flex-shrink:0;overflow:hidden}
+.ph-av img{width:100%;height:100%;object-fit:cover;display:block}
+.feed-g{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:#DBDBDB}
+.fslot{background:#FAFAFA;position:relative;overflow:hidden;cursor:default;transition:outline 0.1s}
+.fslot.has-a{cursor:pointer}
+.fslot.ov{outline:2px solid #4F46E5;outline-offset:-2px}
+.fslot img.slot-img{width:100%;height:100%;object-fit:cover;display:block}
+.fslot .emp{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#F5F4F2;transition:background 0.12s}
+.fslot.ov .emp{background:#E8E6FF}
+.rib{position:absolute;top:0;right:0;width:22px;height:28px;display:flex;align-items:flex-start;justify-content:center;padding-top:2px;z-index:15;pointer-events:none;clip-path:polygon(0 0,100% 0,100% 85%,50% 100%,0 85%);font-size:9px}
+.pbadge{position:absolute;top:4px;left:4px;display:flex;align-items:center;gap:2px;padding:2px 5px;border-radius:10px;font-size:7px;font-weight:700;color:#fff;z-index:15;pointer-events:none;white-space:nowrap}
+.ahov{position:absolute;inset:0;background:rgba(0,0,0,0);transition:background 0.15s;z-index:3}
+.ahov:hover{background:rgba(0,0,0,0.12)}
+.dim-ov{position:absolute;inset:0;background:rgba(0,0,0,0.3);z-index:10;pointer-events:none}
+/* Date/status badge on slot */
+.slot-meta{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.62));padding:3px 4px 3px;display:flex;align-items:center;justify-content:space-between;pointer-events:none;z-index:8}
+.slot-meta-date{font-size:7px;font-weight:700;color:rgba(255,255,255,0.95);letter-spacing:0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot-meta-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-left:3px}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.07)}100%{transform:scale(1)}}
+.popped{animation:pop 0.32s ease}
+.lib-hd{padding:12px 12px 0;border-bottom:0.5px solid var(--sfbr)}
+.tab-row{display:flex;overflow-x:auto;scrollbar-width:none}
+.tab-row::-webkit-scrollbar{display:none}
+.tbt{display:flex;align-items:center;gap:4px;padding:8px 10px;font-size:11px;font-weight:600;color:var(--sft2);background:none;border:none;cursor:pointer;position:relative;white-space:nowrap;opacity:0.55;transition:opacity 0.15s}
+.tbt.on{color:#4F46E5;opacity:1}
+.tbt.on::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:#4F46E5;border-radius:2px 2px 0 0}
+.cbdg{font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;background:var(--sfe);color:var(--sft3)}
+.tbt.on .cbdg{background:#EEF2FF;color:#4F46E5}
+.srch{position:relative;padding:8px 12px}
+.srch input{width:100%;padding:6px 26px;font-size:12px;border-radius:8px;border:0.5px solid var(--sfbr);background:var(--sfe);color:var(--sft1);outline:none}
+.srch input:focus{border-color:#4F46E5}
+.srch .sico{position:absolute;left:20px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--sft3);pointer-events:none}
+.ag{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px}
+.ac{aspect-ratio:1;border-radius:6px;overflow:hidden;position:relative;cursor:grab;border:1.5px solid transparent;transition:border-color 0.15s,box-shadow 0.15s}
+.ac:hover{border-color:#4F46E5}
+.ac.sel{border-color:#4F46E5;box-shadow:0 0 0 3px #EEF2FF}
+.ac img{width:100%;height:100%;object-fit:cover;display:block}
+.ac-del{position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;opacity:0;transition:opacity 0.15s;z-index:25;line-height:1}
+.ac:hover .ac-del{opacity:1}
+.ac-del:hover{background:rgba(220,38,38,0.9)}
+.pchip{display:flex;align-items:center;gap:3px;padding:4px 10px;border-radius:20px;font-size:10px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all 0.15s;white-space:nowrap;flex-shrink:0}
+.ibt{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:0.5px solid var(--sfbr);background:transparent;cursor:pointer;color:var(--sft2);font-size:13px;transition:background 0.1s}
+.ibt:hover{background:var(--sfe)}
+.ibt:disabled{opacity:0.3;cursor:default}
+.zbts{display:flex;align-items:center;border-radius:6px;border:0.5px solid var(--sfbr);overflow:hidden}
+.zbts button{width:26px;height:28px;border:none;background:transparent;cursor:pointer;color:var(--sft2);font-size:14px;display:flex;align-items:center;justify-content:center}
+.zbts button:hover{background:var(--sfe)}
+.zbts button:disabled{opacity:0.3}
+.zbts span{font-size:10px;color:var(--sft2);padding:0 4px;font-weight:600;min-width:34px;text-align:center}
+.ratio-btns{display:flex;align-items:center;border-radius:6px;border:0.5px solid var(--sfbr);overflow:hidden}
+.ratio-btns button{height:28px;padding:0 8px;border:none;background:transparent;cursor:pointer;color:var(--sft2);font-size:10px;font-weight:600;white-space:nowrap;transition:background 0.1s}
+.ratio-btns button:hover{background:var(--sfe)}
+.ratio-btns button.on{background:#4F46E5;color:#fff}
+/* Phone overlay (slot detail) */
+.ph-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;justify-content:center;z-index:50;padding-bottom:16px}
+.slot-detail{background:#fff;border-radius:16px;width:240px;overflow:hidden;box-shadow:0 -4px 32px rgba(0,0,0,0.3)}
+.slot-detail-img{width:100%;height:100px;object-fit:cover;display:block}
+.slot-detail-body{padding:12px}
+/* Status toggle */
+.status-toggle{display:flex;border-radius:8px;overflow:hidden;border:1px solid #E5E5E5;margin-bottom:12px}
+.status-toggle button{flex:1;padding:7px 4px;font-size:10px;font-weight:700;border:none;cursor:pointer;transition:all 0.15s;line-height:1.3}
+.st-posted{background:#22C55E !important;color:#fff !important}
+.st-planned{background:#4F46E5 !important;color:#fff !important}
+.st-inactive{background:#F9FAFB;color:#9CA3AF}
+/* Calendar */
+.cal-section{margin-bottom:10px}
+.cal-section-label{font-size:9px;font-weight:700;color:#9CA3AF;letter-spacing:0.07em;text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
+.cal{background:#F9FAFB;border-radius:10px;overflow:hidden;border:1px solid #EFEFEF}
+.cal-hd{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:#fff;border-bottom:1px solid #F0F0F0}
+.cal-hd-title{font-size:11px;font-weight:700;color:#111;text-transform:capitalize}
+.cal-nav{width:22px;height:22px;border:none;background:none;cursor:pointer;color:#6B7280;font-size:16px;display:flex;align-items:center;justify-content:center;border-radius:4px;padding:0;line-height:1}
+.cal-nav:hover{background:#F3F4F6}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);padding:4px 4px 6px}
+.cal-dow{text-align:center;font-size:7px;font-weight:700;color:#9CA3AF;padding:3px 0;letter-spacing:0.04em}
+.cal-day{text-align:center;font-size:10px;padding:3px 1px;border-radius:4px;cursor:pointer;color:#374151;line-height:1.4;user-select:none}
+.cal-day:hover:not(.empty){background:#E0E7FF}
+.cal-day.empty{cursor:default;pointer-events:none}
+.cal-day.sel{background:#4F46E5;color:#fff;font-weight:700}
+.cal-day.today:not(.sel){color:#4F46E5;font-weight:700}
+.cal-day.past:not(.sel){color:#C4C4C4}
+/* Time */
+.time-row{display:flex;align-items:center;gap:6px;margin-top:8px}
+.time-row label{font-size:9px;font-weight:700;color:#9CA3AF;letter-spacing:0.06em;text-transform:uppercase;white-space:nowrap}
+.time-row input{flex:1;padding:5px 7px;border-radius:6px;border:1px solid #E5E5E5;font-size:11px;color:#111;background:#fff;outline:none;font-family:inherit}
+.time-row input:focus{border-color:#4F46E5}
+.clear-btn{font-size:9px;color:#D1D5DB;background:none;border:none;cursor:pointer;padding:0;white-space:nowrap}
+.clear-btn:hover{color:#EF4444}
+/* Size picker */
+.size-picker{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:12px}
+.size-btn{border:1.5px solid #E5E5E5;background:#F9FAFB;border-radius:7px;cursor:pointer;padding:6px 4px 4px;display:flex;flex-direction:column;align-items:center;gap:3px}
+.size-btn:hover{border-color:#A5B4FC}
+.size-btn.on{border-color:#4F46E5;background:#EEF2FF}
+.size-icon{display:grid;grid-template-columns:1fr 1fr;gap:2px;width:26px;height:26px}
+.size-icon .sc{border-radius:2px;background:#D1D5DB}
+.size-btn.on .size-icon .sc{background:#4F46E5}
+.size-btn.on .size-icon .sc.dim{background:#C7D2FE}
+.size-lbl{font-size:8px;color:#9CA3AF;font-weight:700;letter-spacing:0.03em}
+.size-btn.on .size-lbl{color:#4F46E5}
+.slot-detail-ft{display:flex;gap:6px;margin-top:12px}
+.slot-detail-ft button{flex:1;padding:8px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;border:none}
+.btn-save{background:#4F46E5;color:#fff}
+.btn-close-sd{background:#F3F4F6;color:#374151}
+/* Selection bar */
+.selbr{padding:6px 10px;display:flex;align-items:center;justify-content:space-between;background:#EEF2FF;flex-shrink:0;gap:6px}
+.selbr span{font-size:11px;font-weight:600;color:#4F46E5;white-space:nowrap}
+.selbr-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.del-sel-btn{display:flex;align-items:center;gap:3px;padding:3px 8px;border-radius:5px;background:#FEE2E2;color:#B91C1C;border:none;cursor:pointer;font-size:10px;font-weight:700;white-space:nowrap}
+.del-sel-btn:hover{background:#FECACA}
+.pgr{width:80px;height:3px;border-radius:2px;background:var(--sfe);overflow:hidden}
+.pgr-f{height:100%;background:#4F46E5;border-radius:2px;transition:width 0.3s}
+.posted-dot{position:absolute;bottom:3px;right:3px;width:8px;height:8px;border-radius:50%;background:#22C55E;border:1.5px solid white;z-index:10}
+.sel-check{position:absolute;inset:0;background:rgba(79,70,229,0.22);z-index:5;display:flex;align-items:flex-start;justify-content:flex-end;padding:4px}
+.sel-check-i{width:15px;height:15px;border-radius:50%;background:#4F46E5;display:flex;align-items:center;justify-content:center;font-size:9px;color:white}
+.lsc{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--sfbr) transparent}
+.lftr{padding:8px 12px;border-top:0.5px solid var(--sfbr);flex-shrink:0;display:flex;gap:16px}
+.lstat{text-align:center}
+.lstat-v{font-size:14px;font-weight:700;color:var(--sft1)}
+.lstat-l{font-size:8px;color:var(--sft3);letter-spacing:0.06em}
+.drop-zone{border:2px dashed var(--sfbr);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;color:var(--sft3);font-size:12px;cursor:pointer;transition:border-color 0.15s,background 0.15s;margin:12px}
+.drop-zone:hover,.drop-zone.dz-ov{border-color:#4F46E5;background:#F5F4FF;color:#4F46E5}
+/* Upload modal */
+.upm{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:999}
+.upc{background:#fff;border-radius:16px;width:520px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.25)}
+.upc-hd{padding:16px 20px;border-bottom:0.5px solid #E5E5E5;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.upc-hd h3{font-size:15px;font-weight:700;color:#111}
+.upc-hd button{background:none;border:none;cursor:pointer;font-size:20px;color:#888;line-height:1}
+.upc-body{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.up-item{display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;background:#F9F9F9;border:0.5px solid #E5E5E5}
+.up-thumb{width:56px;height:56px;border-radius:8px;object-fit:cover;flex-shrink:0}
+.up-info{flex:1;min-width:0}
+.up-fname{font-size:12px;font-weight:600;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px}
+.ct-btns{display:flex;gap:4px;flex-wrap:wrap}
+.ctb{padding:3px 8px;border-radius:20px;font-size:10px;font-weight:600;cursor:pointer;border:1.5px solid;transition:all 0.12s;background:transparent}
+.ctb.on{color:#fff}
+.upc-ft{padding:12px 20px;border-top:0.5px solid #E5E5E5;display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+.upc-ft button{padding:8px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none}
+.btn-cancel{background:#F3F4F6;color:#374151}
+.btn-add{background:#4F46E5;color:#fff}
+/* Edit profile */
+.ep-modal{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:999}
+.ep-card{background:#fff;border-radius:16px;width:440px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.25)}
+.ep-hd{padding:16px 20px;border-bottom:0.5px solid #E5E5E5;display:flex;align-items:center;justify-content:space-between}
+.ep-hd h3{font-size:15px;font-weight:700;color:#111}
+.ep-hd button{background:none;border:none;cursor:pointer;font-size:20px;color:#888;line-height:1}
+.ep-body{padding:20px;display:flex;flex-direction:column;gap:16px}
+.ep-av-wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+.ep-av{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#f093fb,#f5576c);display:flex;align-items:center;justify-content:center;color:#fff;font-size:26px;font-weight:700;overflow:hidden;position:relative;cursor:pointer}
+.ep-av img{width:100%;height:100%;object-fit:cover;display:block}
+.ep-av-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.15s;font-size:20px}
+.ep-av:hover .ep-av-overlay{opacity:1}
+.ep-av-hint{font-size:11px;color:#6B7280}
+.ep-field{display:flex;flex-direction:column;gap:4px}
+.ep-field label{font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:0.05em}
+.ep-field input,.ep-field textarea{padding:8px 10px;border-radius:8px;border:0.5px solid #E5E5E5;font-size:13px;color:#111;background:#FAFAFA;outline:none;font-family:inherit;resize:none}
+.ep-field input:focus,.ep-field textarea:focus{border-color:#4F46E5;background:#fff}
+.ep-stats{display:flex;gap:10px}
+.ep-stats .ep-field{flex:1}
+.ep-ft{padding:12px 20px;border-top:0.5px solid #E5E5E5;display:flex;gap:8px;justify-content:flex-end}
+.ep-ft button{padding:8px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none}
+/* Dark */
+.dk .phone-f{background:#2C2C2E}
+.dk .phone-sc,.dk .ph-sb,.dk .ph-prof{background:#1C1C1E}
+.dk .feed-g{background:#000}
+.dk .fslot,.dk .fslot .emp{background:#111}
+.dk .fslot.ov .emp{background:#1E1B4B}
+.dk .slot-detail{background:#1E1E1E}
+.dk .status-toggle{border-color:#333}
+.dk .st-inactive{background:#2A2A2A;color:#555}
+.dk .cal{background:#2A2A2A;border-color:#333}
+.dk .cal-hd{background:#1E1E1E;border-color:#333}
+.dk .cal-hd-title{color:#E5E5E5}
+.dk .cal-day{color:#D1D5DB}
+.dk .cal-day:hover:not(.empty){background:#312E81}
+.dk .cal-day.past:not(.sel){color:#444}
+.dk .time-row input{background:#2A2A2A;border-color:#444;color:#E5E5E5}
+.dk .btn-close-sd{background:#333;color:#ccc}
+.dk .size-btn{border-color:#333;background:#2A2A2A}
+.dk .size-btn:hover{border-color:#6366F1}
+.dk .size-btn.on{border-color:#4F46E5;background:#1E1B4B}
+.dk .size-lbl{color:#555}
+.dk .size-btn.on .size-lbl{color:#818CF8}
+.dk .upc,.dk .ep-card{background:#1E1E1E}
+.dk .upc-hd,.dk .ep-hd,.dk .upc-ft,.dk .ep-ft{border-color:#333}
+.dk .upc-hd h3,.dk .ep-hd h3{color:#F0F0F0}
+.dk .up-item{background:#2A2A2A;border-color:#333}
+.dk .up-fname{color:#F0F0F0}
+.dk .ep-field input,.dk .ep-field textarea{background:#2A2A2A;border-color:#444;color:#F0F0F0}
+.dk .ep-field label,.dk .ep-av-hint{color:#9CA3AF}
+.dk .ep-hd button,.dk .upc-hd button{color:#666}
+.dk .selbr{background:#1E1B4B}
+.dk .ph-prof .pstat-v{color:#E5E5E5}
+.dk .ph-prof .pname{color:#E5E5E5}
+.dk .ph-prof .pbio{color:#AAA}
+.dk .ph-prof .pedit{background:#333;border-color:#555;color:#E5E5E5}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel">
+const {useState,useReducer,useEffect,useRef}=React;
+
+const MONTHS_ES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const MONTHS_SH=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const DAYS_ES=['D','L','M','X','J','V','S'];
+
+const PILLARS=[
+  {id:'edu',sl:'Edu',e:'📚',c:'#3B82F6',bg:'#EFF6FF'},
+  {id:'inspire',sl:'Inspo',e:'✨',c:'#8B5CF6',bg:'#F5F3FF'},
+  {id:'entertain',sl:'Enter',e:'🎭',c:'#F59E0B',bg:'#FFFBEB'},
+  {id:'promo',sl:'Promo',e:'📣',c:'#10B981',bg:'#ECFDF5'},
+  {id:'personal',sl:'Pers',e:'💛',c:'#EC4899',bg:'#FDF2F8'},
+  {id:'community',sl:'Com',e:'🤝',c:'#06B6D4',bg:'#ECFEFF'},
+];
+const CT={
+  photo:{e:'📷',label:'Photo',c:'#6B7280',bg:'rgba(107,114,128,0.88)'},
+  video:{e:'🎬',label:'Video',c:'#EF4444',bg:'rgba(239,68,68,0.88)'},
+  reel:{e:'🎞️',label:'Reel',c:'#8B5CF6',bg:'rgba(139,92,246,0.88)'},
+  story:{e:'⭕',label:'Story',c:'#F59E0B',bg:'rgba(245,158,11,0.88)'},
+  carousel:{e:'🔲',label:'Slides',c:'#3B82F6',bg:'rgba(59,130,246,0.88)'},
+};
+const CT_KEYS=Object.keys(CT);
+const INIT_ASSETS=[];
+const mkSlots=()=>Array.from({length:60},(_,i)=>({
+  id:`s${i+1}`,aid:null,pid:null,status:null,postDate:null,postTime:null,cols:1,rows:1
+}));
+const INIT_SLOTS=mkSlots();
+
+let drag=null;
+let uidc=100;
+const uid=()=>`u${++uidc}`;
+
+/* ── Persistencia ── */
+const LS_FS='sfp_feed';
+const LS_PROF='sfp_profile';
+const DEFAULT_PROFILE={name:'lagutierrez.studio',bio:'Arquitectura de identidad ✦ Worldbuilding creativo · BCN',avatar:null,initials:'L',followers:'12.4k',following:'842'};
+
+function loadProfile(){
+  try{const s=localStorage.getItem(LS_PROF);if(s)return JSON.parse(s);}catch(e){}
+  return DEFAULT_PROFILE;
+}
+function loadFS(){
+  try{
+    const s=localStorage.getItem(LS_FS);
+    if(s){
+      const d=JSON.parse(s);
+      const assets=d.assets||[];
+      // Sync uid counter so new uploads never collide with existing IDs
+      assets.forEach(a=>{
+        const n=parseInt((a.id||'').replace('u',''));
+        if(!isNaN(n)&&n>uidc)uidc=n;
+      });
+      return{assets,slots:d.slots||mkSlots(),past:[],fut:[]};
+    }
+  }catch(e){}
+  return{assets:INIT_ASSETS,slots:INIT_SLOTS,past:[],fut:[]};
+}
+
+function fileToBase64(file,maxDim=1080,quality=0.82){
+  return new Promise(res=>{
+    const img=new Image();
+    const tmp=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(tmp);
+      const ratio=Math.min(maxDim/img.width,maxDim/img.height,1);
+      const w=Math.round(img.width*ratio);
+      const h=Math.round(img.height*ratio);
+      const cv=document.createElement('canvas');
+      cv.width=w;cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      res(cv.toDataURL('image/jpeg',quality));
+    };
+    img.src=tmp;
+  });
+}
+
+function fmtDate(d){
+  if(!d)return'';
+  const dt=new Date(d+'T00:00:00');
+  return`${dt.getDate()} ${MONTHS_SH[dt.getMonth()]}`;
+}
+
+function red(st,a){
+  const snap=()=>[...st.past.slice(-39),{assets:st.assets,slots:st.slots}];
+  switch(a.t){
+    case'INS':return{...st,past:snap(),fut:[],slots:st.slots.map(s=>{
+      if(s.id===a.sid)return{...s,aid:a.aid};
+      if(s.aid===a.aid)return{...s,aid:null,status:null,postDate:null,postTime:null};
+      return s;
+    })};
+    case'REM':return{...st,past:snap(),fut:[],slots:st.slots.map(s=>s.id===a.sid?{...s,aid:null,status:null,postDate:null,postTime:null}:s)};
+    case'SWP':{
+      const aa=st.slots.find(s=>s.id===a.a),bb=st.slots.find(s=>s.id===a.b);
+      return{...st,past:snap(),fut:[],slots:st.slots.map(s=>{
+        if(s.id===a.a)return{...s,aid:bb?.aid??null,pid:bb?.pid??null,status:bb?.status??null,postDate:bb?.postDate??null,postTime:bb?.postTime??null,cols:bb?.cols??1,rows:bb?.rows??1};
+        if(s.id===a.b)return{...s,aid:aa?.aid??null,pid:aa?.pid??null,status:aa?.status??null,postDate:aa?.postDate??null,postTime:aa?.postTime??null,cols:aa?.cols??1,rows:aa?.rows??1};
+        return s;
+      })};
+    }
+    case'TAG':return{...st,slots:st.slots.map(s=>s.id===a.sid?{...s,pid:a.pid}:s)};
+    case'SET_META':return{...st,past:snap(),fut:[],slots:st.slots.map(s=>s.id===a.sid?{...s,status:a.status,postDate:a.postDate,postTime:a.postTime,cols:a.cols||1,rows:a.rows||1}:s)};
+    case'ADD_ASSETS':return{...st,assets:[...st.assets,...a.items]};
+    case'DEL_ASSET':return{...st,past:snap(),fut:[],
+      assets:st.assets.filter(x=>x.id!==a.id),
+      slots:st.slots.map(s=>s.aid===a.id?{...s,aid:null,status:null,postDate:null,postTime:null}:s)};
+    case'DEL_MULTI':return{...st,past:snap(),fut:[],
+      assets:st.assets.filter(x=>!a.ids.includes(x.id)),
+      slots:st.slots.map(s=>a.ids.includes(s.aid)?{...s,aid:null,status:null,postDate:null,postTime:null}:s)};
+    case'UND':{
+      if(!st.past.length)return st;
+      const p=[...st.past],pv=p.pop();
+      return{...st,past:p,assets:pv.assets,slots:pv.slots,fut:[{assets:st.assets,slots:st.slots},...st.fut.slice(0,39)]};
+    }
+    case'RED':{
+      if(!st.fut.length)return st;
+      const[nx,...f]=st.fut;
+      return{...st,past:[...st.past.slice(-39),{assets:st.assets,slots:st.slots}],assets:nx.assets,slots:nx.slots,fut:f};
+    }
+    case'RST':return{...st,past:snap(),fut:[],slots:mkSlots()};
+    default:return st;
+  }
+}
+
+/* ── Calendar ── */
+function Calendar({value,onChange}){
+  const today=new Date();
+  today.setHours(0,0,0,0);
+  const sel=value?new Date(value+'T00:00:00'):null;
+  const[v,setV]=useState(()=>{
+    const d=sel||today;
+    return{y:d.getFullYear(),m:d.getMonth()};
+  });
+
+  const daysInMonth=new Date(v.y,v.m+1,0).getDate();
+  const startDow=new Date(v.y,v.m,1).getDay();
+  const cells=[];
+  for(let i=0;i<startDow;i++)cells.push(null);
+  for(let d=1;d<=daysInMonth;d++)cells.push(d);
+
+  function isSel(d){
+    if(!sel||!d)return false;
+    return sel.getFullYear()===v.y&&sel.getMonth()===v.m&&sel.getDate()===d;
+  }
+  function isToday(d){
+    if(!d)return false;
+    const t=new Date(today);
+    return t.getFullYear()===v.y&&t.getMonth()===v.m&&t.getDate()===d;
+  }
+  function isPast(d){
+    if(!d)return false;
+    const dt=new Date(v.y,v.m,d);
+    return dt<today;
+  }
+  function pick(d){
+    if(!d)return;
+    const mo=String(v.m+1).padStart(2,'0');
+    const da=String(d).padStart(2,'0');
+    onChange(`${v.y}-${mo}-${da}`);
+  }
+  function prev(){setV(x=>x.m===0?{y:x.y-1,m:11}:{...x,m:x.m-1});}
+  function next(){setV(x=>x.m===11?{y:x.y+1,m:0}:{...x,m:x.m+1});}
+
+  return(
+    <div className="cal">
+      <div className="cal-hd">
+        <button className="cal-nav" onClick={prev}>‹</button>
+        <span className="cal-hd-title">{MONTHS_ES[v.m].toLowerCase()} {v.y}</span>
+        <button className="cal-nav" onClick={next}>›</button>
+      </div>
+      <div className="cal-grid">
+        {DAYS_ES.map(d=><div key={d} className="cal-dow">{d}</div>)}
+        {cells.map((d,i)=>(
+          <div key={i}
+            className={`cal-day${!d?' empty':''}${isSel(d)?' sel':isToday(d)?' today':isPast(d)?' past':''}`}
+            onClick={()=>pick(d)}
+          >{d||''}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Slot detail popup ── */
+const SIZES=[
+  {cols:1,rows:1,lbl:'1×1',grid:[[1,0],[0,0]]},
+  {cols:2,rows:1,lbl:'2×1',grid:[[1,1],[0,0]]},
+  {cols:1,rows:2,lbl:'1×2',grid:[[1,0],[1,0]]},
+  {cols:2,rows:2,lbl:'2×2',grid:[[1,1],[1,1]]},
+];
+
+function SizeIcon({grid,on}){
+  return(
+    <div className="size-icon">
+      {grid.flat().map((filled,i)=>(
+        <div key={i} className={`sc${filled?'':(on?' dim':'')}`}
+          style={{background:filled?(on?'#4F46E5':'#6B7280'):'#E5E5E5'}}/>
+      ))}
+    </div>
+  );
+}
+
+function SlotDetail({slot,asset,onSave,onClose,dark}){
+  const[status,setStatus]=useState(slot.status||null);
+  const[date,setDate]=useState(slot.postDate||'');
+  const[time,setTime]=useState(slot.postTime||'');
+  const[cols,setCols]=useState(slot.cols||1);
+  const[rows,setRows]=useState(slot.rows||1);
+
+  function toggleStatus(val){
+    setStatus(s=>s===val?null:val);
+  }
+
+  function save(){
+    onSave({status,postDate:date||null,postTime:time||null,cols,rows});
+    onClose();
+  }
+
+  return(
+    <div className="ph-overlay" onClick={onClose}>
+      <div className={`slot-detail${dark?' dk':''}`} onClick={e=>e.stopPropagation()}>
+        {asset&&<img className="slot-detail-img" src={asset.url} alt=""/>}
+        <div className="slot-detail-body">
+
+          {/* Size picker */}
+          <div className="cal-section-label" style={{marginBottom:6}}><span>Tamaño</span></div>
+          <div className="size-picker">
+            {SIZES.map(sz=>{
+              const on=cols===sz.cols&&rows===sz.rows;
+              return(
+                <button key={sz.lbl} className={`size-btn${on?' on':''}`}
+                  onClick={()=>{setCols(sz.cols);setRows(sz.rows);}}>
+                  <SizeIcon grid={sz.grid} on={on}/>
+                  <span className="size-lbl">{sz.lbl}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Status */}
+          <div className="status-toggle">
+            <button
+              className={status==='posted'?'st-posted':'st-inactive'}
+              onClick={()=>toggleStatus('posted')}
+            >✓ Publicado</button>
+            <button
+              className={status==='planned'?'st-planned':'st-inactive'}
+              onClick={()=>toggleStatus('planned')}
+            >🗓 Planificado</button>
+          </div>
+
+          {/* Calendar */}
+          <div className="cal-section">
+            <div className="cal-section-label">
+              <span>{status==='posted'?'Fecha de publicación':'Fecha planificada'}</span>
+              {date&&<button className="clear-btn" onClick={()=>{setDate('');setTime('');}}>Limpiar ×</button>}
+            </div>
+            <Calendar value={date} onChange={setDate}/>
+            <div className="time-row">
+              <label>Hora</label>
+              <input type="time" value={time} onChange={e=>setTime(e.target.value)}/>
+            </div>
+          </div>
+
+          <div className="slot-detail-ft">
+            <button className="btn-close-sd" onClick={onClose}>Cancelar</button>
+            <button className="btn-save" onClick={save}>Guardar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Slot ── */
+function Slot({slot,assets,dispatch,ap,setActive,ratio}){
+  const[ov,setOv]=useState(false);
+  const[pp,setPp]=useState(false);
+  const asset=slot.aid?assets.find(a=>a.id===slot.aid):null;
+  const pillar=slot.pid?PILLARS.find(p=>p.id===slot.pid):null;
+  const ct=asset?CT[asset.ct]:null;
+  const statusColor=slot.status==='posted'?'#22C55E':slot.status==='planned'?'#4F46E5':null;
+  const showMeta=asset&&(slot.postDate||statusColor);
+  const c=slot.cols||1;
+  const r=slot.rows||1;
+
+  return(
+    <div className={`fslot${asset?' has-a':''}${ov?' ov':''}${pp?' popped':''}`}
+      onDragOver={e=>{e.preventDefault();setOv(true);}}
+      onDragLeave={()=>setOv(false)}
+      onDrop={e=>{
+        e.preventDefault();setOv(false);
+        if(!drag)return;
+        if(drag.t==='asset'){dispatch({t:'INS',sid:slot.id,aid:drag.aid});setPp(true);setTimeout(()=>setPp(false),400);}
+        else if(drag.t==='slot'&&drag.sid!==slot.id){dispatch({t:'SWP',a:drag.sid,b:slot.id});setPp(true);setTimeout(()=>setPp(false),400);}
+        drag=null;
+      }}
+      draggable={!!asset}
+      onDragStart={e=>{if(!asset)return;drag={t:'slot',sid:slot.id,aid:slot.aid};e.dataTransfer.effectAllowed='move';}}
+      onClick={()=>{
+        if(!asset)return;
+        if(ap){dispatch({t:'TAG',sid:slot.id,pid:slot.pid===ap?null:ap});}
+        else{setActive(slot.id);}
+      }}
+      style={{
+        cursor:asset?(ap?'crosshair':'pointer'):'default',
+        gridColumn:c>1?`span ${c}`:undefined,
+        gridRow:r>1?`span ${r}`:undefined,
+        aspectRatio:c===2&&r===2?'1/1':c===2?'2/1':r===2?(ratio==='4:3'?'3/8':'1/2'):ratio==='4:3'?'3/4':'1/1',
+      }}
+    >
+      {asset?(
+        <>
+          <img className="slot-img" src={asset.url} alt="" loading="lazy"/>
+          {ap&&slot.pid!==ap&&<div className="dim-ov"/>}
+          {ct&&<div className="rib" style={{background:ct.bg}}><span>{ct.e}</span></div>}
+          {pillar&&<div className="pbadge" style={{background:pillar.c}}><span>{pillar.e}</span><span>{pillar.sl}</span></div>}
+          {showMeta&&(
+            <div className="slot-meta">
+              <span className="slot-meta-date">{fmtDate(slot.postDate)}</span>
+              {statusColor&&<span className="slot-meta-dot" style={{background:statusColor}}/>}
+            </div>
+          )}
+          <div className="ahov"/>
+        </>
+      ):(
+        <div className="emp">{ov&&<span style={{fontSize:18,color:'#4F46E5',opacity:0.7}}>+</span>}</div>
+      )}
+    </div>
+  );
+}
+
+/* ── Profile ── */
+function Profile({profile,onEdit}){
+  return(
+    <div className="ph-prof">
+      <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:10}}>
+        <div className="ph-av">
+          {profile.avatar?<img src={profile.avatar} alt="av"/>:<span>{profile.initials||'?'}</span>}
+        </div>
+        <div style={{flex:1}}>
+          <div style={{display:'flex',gap:14,marginBottom:4}}>
+            {[['60','Posts'],[profile.followers,'Seguidores'],[profile.following,'Siguiendo']].map(([val,key])=>(
+              <div key={key} style={{textAlign:'center'}}>
+                <div className="pstat-v" style={{fontSize:13,fontWeight:700,color:'#111'}}>{val}</div>
+                <div style={{fontSize:10,color:'#888'}}>{key}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div style={{marginBottom:8}}>
+        <div className="pname" style={{fontSize:13,fontWeight:700,color:'#111'}}>{profile.name}</div>
+        {profile.bio&&<div className="pbio" style={{fontSize:12,color:'#555',lineHeight:1.4,whiteSpace:'pre-wrap'}}>{profile.bio}</div>}
+      </div>
+      <div style={{marginBottom:10}}>
+        <button className="pedit" onClick={onEdit} style={{width:'100%',padding:'6px 0',borderRadius:6,border:'1px solid #DBDBDB',background:'#fff',fontSize:13,fontWeight:600,color:'#111',cursor:'pointer'}}>Editar perfil</button>
+      </div>
+      <div style={{display:'flex',borderTop:'1px solid #DBDBDB',marginLeft:-16,marginRight:-16}}>
+        {[['▦','POSTS',true],['▷','REELS',false],['⊙','TAGS',false]].map(([ic,lb,ac])=>(
+          <div key={lb} className={ac?'ptab-act':'ptab'} style={{flex:1,padding:'9px 0',textAlign:'center',fontSize:10,fontWeight:700,color:ac?'#111':'#999',cursor:'pointer',borderBottom:ac?'2px solid #111':'2px solid transparent'}}>
+            <div style={{fontSize:15,marginBottom:1}}>{ic}</div>
+            <div>{lb}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Edit profile modal ── */
+function EditProfileModal({profile,onSave,onClose,dark}){
+  const[form,setForm]=useState({...profile});
+  const avRef=useRef();
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  return(
+    <div className="ep-modal" onClick={onClose}>
+      <div className={`ep-card${dark?' dk':''}`} onClick={e=>e.stopPropagation()}>
+        <div className="ep-hd">
+          <h3>Editar perfil</h3>
+          <button onClick={onClose}>×</button>
+        </div>
+        <div className="ep-body">
+          <div className="ep-av-wrap">
+            <input ref={avRef} type="file" accept="image/*" style={{display:'none'}} onChange={async e=>{
+              const f=e.target.files[0];
+              if(!f)return;
+              set('avatar',await fileToBase64(f,400,0.9));
+            }}/>
+            <div className="ep-av" onClick={()=>avRef.current.click()}>
+              {form.avatar?<img src={form.avatar} alt="av"/>:<span>{form.initials||'?'}</span>}
+              <div className="ep-av-overlay">📷</div>
+            </div>
+            <span className="ep-av-hint">Toca para cambiar la foto</span>
+          </div>
+          {!form.avatar&&(
+            <div className="ep-field">
+              <label>Iniciales</label>
+              <input maxLength={2} value={form.initials||''} onChange={e=>set('initials',e.target.value.toUpperCase())} placeholder="LG"/>
+            </div>
+          )}
+          <div className="ep-field">
+            <label>Nombre de usuario</label>
+            <input value={form.name} onChange={e=>set('name',e.target.value)}/>
+          </div>
+          <div className="ep-field">
+            <label>Biografía</label>
+            <textarea rows={3} value={form.bio} onChange={e=>set('bio',e.target.value)}/>
+          </div>
+          <div className="ep-stats">
+            <div className="ep-field"><label>Seguidores</label><input value={form.followers} onChange={e=>set('followers',e.target.value)}/></div>
+            <div className="ep-field"><label>Siguiendo</label><input value={form.following} onChange={e=>set('following',e.target.value)}/></div>
+          </div>
+        </div>
+        <div className="ep-ft">
+          <button className="btn-cancel" onClick={onClose}>Cancelar</button>
+          <button className="btn-add" onClick={()=>{onSave(form);onClose();}}>Guardar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Upload modal ── */
+function UploadModal({pending,onConfirm,onClose,dark}){
+  const[items,setItems]=useState(()=>pending.map(p=>({...p,ct:'photo'})));
+  const setCt=(idx,ct)=>setItems(prev=>prev.map((it,i)=>i===idx?{...it,ct}:it));
+  return(
+    <div className="upm" onClick={onClose}>
+      <div className={`upc${dark?' dk':''}`} onClick={e=>e.stopPropagation()}>
+        <div className="upc-hd">
+          <h3>Agregar a librería ({items.length})</h3>
+          <button onClick={onClose}>×</button>
+        </div>
+        <div className="upc-body">
+          {items.map((it,idx)=>(
+            <div key={idx} className="up-item">
+              <img className="up-thumb" src={it.url} alt=""/>
+              <div className="up-info">
+                <div className="up-fname">{it.name}</div>
+                <div className="ct-btns">
+                  {CT_KEYS.map(k=>{
+                    const c=CT[k];const on=it.ct===k;
+                    return<button key={k} className={`ctb${on?' on':''}`} style={{borderColor:c.c,color:on?'#fff':c.c,background:on?c.c:'transparent'}} onClick={()=>setCt(idx,k)}>{c.e} {c.label}</button>;
+                  })}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="upc-ft">
+          <button className="btn-cancel" onClick={onClose}>Cancelar</button>
+          <button className="btn-add" onClick={()=>{onConfirm(items);onClose();}}>Agregar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Pillar bar ── */
+function PillarBar({ap,setAp,slots}){
+  const cnts={};PILLARS.forEach(p=>{cnts[p.id]=slots.filter(s=>s.pid===p.id).length;});
+  return(
+    <div className="sf-pbar">
+      <span style={{fontSize:9,fontWeight:700,color:'var(--sft3)',letterSpacing:'0.07em',flexShrink:0,marginRight:4}}>PILARES</span>
+      {PILLARS.map(p=>{
+        const act=ap===p.id;
+        return(
+          <button key={p.id} className="pchip"
+            onClick={()=>setAp(ap===p.id?null:p.id)}
+            style={{background:act?p.c:p.bg,color:act?'#fff':p.c,borderColor:act?p.c:`${p.c}50`}}
+          >
+            <span style={{fontSize:12}}>{p.e}</span>
+            <span>{p.sl}</span>
+            {cnts[p.id]>0&&<span style={{fontSize:9,fontWeight:700,background:act?'rgba(255,255,255,0.25)':`${p.c}20`,color:act?'#fff':p.c,padding:'1px 4px',borderRadius:3}}>{cnts[p.id]}</span>}
+          </button>
+        );
+      })}
+      {ap&&<button onClick={()=>setAp(null)} style={{border:'none',background:'none',cursor:'pointer',color:'var(--sft2)',fontSize:18,lineHeight:1,flexShrink:0}}>×</button>}
+    </div>
+  );
+}
+
+/* ── Asset card ── */
+function AssetCard({asset,sel,onSel,posted,onDelete}){
+  const ct=CT[asset.ct];
+  return(
+    <div className={`ac${sel?' sel':''}`}
+      draggable
+      onDragStart={e=>{drag={t:'asset',aid:asset.id};e.dataTransfer.effectAllowed='copy';}}
+      onClick={()=>onSel(asset.id)}
+    >
+      <img src={asset.url} alt="" loading="lazy"/>
+      {ct&&<div className="rib" style={{background:ct.bg,fontSize:9}}>{ct.e}</div>}
+      {posted&&<div className="posted-dot"/>}
+      {sel&&<div className="sel-check"><div className="sel-check-i">✓</div></div>}
+      <button className="ac-del" onClick={e=>{e.stopPropagation();onDelete(asset.id);}}>×</button>
+    </div>
+  );
+}
+
+/* ── App ── */
+function App(){
+  const[fs,dispatch]=useReducer(red,null,loadFS);
+  const[tab,setTab]=useState('all');
+  const[ap,setAp]=useState(null);
+  const[activeSlot,setActiveSlot]=useState(null);
+  const[sel,setSel]=useState([]);
+  const[zoom,setZoom]=useState(0.75);
+  const[ratio,setRatio]=useState('1:1');
+  const[dark,setDark]=useState(false);
+  const[q,setQ]=useState('');
+  const[pending,setPending]=useState(null);
+  const[dzOver,setDzOver]=useState(false);
+  const[showEditProfile,setShowEditProfile]=useState(false);
+  const[profile,setProfile]=useState(loadProfile);
+  const fileRef=useRef();
+
+  const posted=new Set(fs.slots.filter(s=>s.status==='posted'&&s.aid).map(s=>s.aid));
+  const inFeed=new Set(fs.slots.map(s=>s.aid).filter(Boolean));
+  const unpostedCount=fs.assets.filter(a=>!inFeed.has(a.id)).length;
+  const filled=fs.slots.filter(s=>s.aid).length;
+  const pct=Math.round(filled/60*100);
+
+  const activeSlotObj=activeSlot?fs.slots.find(s=>s.id===activeSlot):null;
+  const activeAsset=activeSlotObj?.aid?fs.assets.find(a=>a.id===activeSlotObj.aid):null;
+
+  const TABS=[
+    {id:'all',lb:'All',n:fs.assets.length},
+    {id:'photo',lb:'Photo',n:fs.assets.filter(a=>a.ct==='photo').length},
+    {id:'reel',lb:'Reel',n:fs.assets.filter(a=>a.ct==='reel').length},
+    {id:'unposted',lb:'Sin postear',n:unpostedCount},
+  ];
+
+  const filtered=fs.assets.filter(a=>{
+    if(tab==='photo'&&a.ct!=='photo')return false;
+    if(tab==='reel'&&a.ct!=='reel')return false;
+    if(tab==='unposted'&&inFeed.has(a.id))return false;
+    if(q&&!a.name.toLowerCase().includes(q.toLowerCase()))return false;
+    return true;
+  });
+
+  async function processFiles(files){
+    const imgs=[...files].filter(f=>f.type.startsWith('image/'));
+    if(!imgs.length)return;
+    const items=await Promise.all(imgs.map(async f=>({
+      id:uid(),
+      name:f.name.replace(/\.[^.]+$/,''),
+      url:await fileToBase64(f),
+      ct:'photo',
+    })));
+    setPending(items);
+  }
+
+  function handleDelete(id){
+    if(inFeed.has(id)&&!window.confirm('Esta imagen está en el feed. ¿Eliminarla?'))return;
+    dispatch({t:'DEL_ASSET',id});
+    setSel(s=>s.filter(x=>x!==id));
+  }
+
+  function handleDeleteSelected(){
+    const any=sel.some(id=>inFeed.has(id));
+    if(!window.confirm(any?`¿Eliminar ${sel.length} imagen(es)? Algunas están en el feed.`:`¿Eliminar ${sel.length} imagen(es)?`))return;
+    dispatch({t:'DEL_MULTI',ids:sel});
+    setSel([]);
+  }
+
+  useEffect(()=>{
+    try{localStorage.setItem(LS_FS,JSON.stringify({assets:fs.assets,slots:fs.slots}));}catch(e){}
+  },[fs.assets,fs.slots]);
+
+  useEffect(()=>{
+    try{localStorage.setItem(LS_PROF,JSON.stringify(profile));}catch(e){}
+  },[profile]);
+
+  useEffect(()=>{
+    const fn=e=>{
+      if((e.metaKey||e.ctrlKey)&&!e.shiftKey&&e.key==='z'){dispatch({t:'UND'});e.preventDefault();}
+      if((e.metaKey||e.ctrlKey)&&(e.key==='y'||(e.shiftKey&&e.key==='z'))){dispatch({t:'RED'});e.preventDefault();}
+      if(e.key==='Escape'){setActiveSlot(null);setPending(null);setShowEditProfile(false);}
+    };
+    window.addEventListener('keydown',fn);
+    return()=>window.removeEventListener('keydown',fn);
+  },[]);
+
+  return(
+    <div className={`sfp${dark?' dk':''}`}>
+      {pending&&<UploadModal pending={pending} onConfirm={items=>{dispatch({t:'ADD_ASSETS',items});setPending(null);}} onClose={()=>setPending(null)} dark={dark}/>}
+      {showEditProfile&&<EditProfileModal profile={profile} onSave={p=>setProfile(p)} onClose={()=>setShowEditProfile(false)} dark={dark}/>}
+      <input ref={fileRef} type="file" accept="image/*" multiple style={{display:'none'}} onChange={e=>{processFiles(e.target.files);e.target.value='';}}/>
+
+      {/* Topbar */}
+      <div className="sfp-tb">
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <span style={{fontSize:13,fontWeight:700,color:'var(--sft1)'}}>📱 Social Feed Planner</span>
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <div className="pgr"><div className="pgr-f" style={{width:`${pct}%`}}/></div>
+            <span style={{fontSize:10,color:'var(--sft3)',fontWeight:600}}>{filled}/60</span>
+          </div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:6}}>
+          <button className="ibt" title="Undo ⌘Z" disabled={!fs.past.length} onClick={()=>dispatch({t:'UND'})}>↩</button>
+          <button className="ibt" title="Redo ⌘⇧Z" disabled={!fs.fut.length} onClick={()=>dispatch({t:'RED'})}>↪</button>
+          <div className="zbts">
+            <button disabled={zoom<=0.5} onClick={()=>setZoom(z=>Math.max(0.5,+(z-0.25).toFixed(2)))}>−</button>
+            <span>{Math.round(zoom*100)}%</span>
+            <button disabled={zoom>=1.25} onClick={()=>setZoom(z=>Math.min(1.25,+(z+0.25).toFixed(2)))}>+</button>
+          </div>
+          <div className="ratio-btns">
+            <button className={ratio==='1:1'?'on':''} onClick={()=>setRatio('1:1')}>1:1</button>
+            <button className={ratio==='4:3'?'on':''} onClick={()=>setRatio('4:3')}>4:3</button>
+          </div>
+          <button className="ibt" onClick={()=>setDark(d=>!d)}>{dark?'☀':'🌙'}</button>
+          <button className="ibt" onClick={()=>dispatch({t:'RST'})} style={{fontSize:14}}>↺</button>
+        </div>
+      </div>
+
+      <div className="sfp-body">
+        {/* Library */}
+        <div className="sf-lib">
+          <div className="lib-hd">
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+              <span style={{fontSize:12,fontWeight:700,color:'var(--sft1)'}}>Content Library</span>
+              <button style={{fontSize:10,fontWeight:700,padding:'4px 10px',borderRadius:6,background:'#4F46E5',color:'#fff',border:'none',cursor:'pointer'}} onClick={()=>fileRef.current.click()}>+ Upload</button>
+            </div>
+            <div className="tab-row">
+              {TABS.map(t=>(
+                <button key={t.id} className={`tbt${tab===t.id?' on':''}`} onClick={()=>setTab(t.id)}>
+                  {t.lb}<span className="cbdg">{t.n}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="srch">
+            <span className="sico">🔍</span>
+            <input placeholder="Buscar…" value={q} onChange={e=>setQ(e.target.value)}/>
+          </div>
+          {sel.length>0&&(
+            <div className="selbr">
+              <span>{sel.length} seleccionadas</span>
+              <div className="selbr-actions">
+                <button className="del-sel-btn" onClick={handleDeleteSelected}>🗑 Eliminar {sel.length}</button>
+                <button onClick={()=>setSel([])} style={{border:'none',background:'none',cursor:'pointer',color:'#4F46E5',fontSize:18,lineHeight:1}}>×</button>
+              </div>
+            </div>
+          )}
+          <div className="lsc"
+            onDragOver={e=>{e.preventDefault();setDzOver(true);}}
+            onDragLeave={()=>setDzOver(false)}
+            onDrop={e=>{e.preventDefault();setDzOver(false);if(e.dataTransfer.files.length)processFiles(e.dataTransfer.files);}}
+          >
+            {filtered.length>0?(
+              <div className="ag">
+                {filtered.map(a=>(
+                  <AssetCard key={a.id} asset={a}
+                    sel={sel.includes(a.id)}
+                    onSel={id=>setSel(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id])}
+                    posted={posted.has(a.id)}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </div>
+            ):(
+              <div className={`drop-zone${dzOver?' dz-ov':''}`} onClick={()=>fileRef.current.click()}>
+                <span style={{fontSize:26}}>☁️</span>
+                <span style={{fontWeight:600}}>Arrastra imágenes aquí</span>
+                <span style={{fontSize:11}}>o haz click para subir</span>
+              </div>
+            )}
+            {filtered.length>0&&(
+              <div className={`drop-zone${dzOver?' dz-ov':''}`} style={{marginTop:0}} onClick={()=>fileRef.current.click()}>
+                <span style={{fontSize:16}}>☁️</span>
+                <span style={{fontSize:11,fontWeight:600}}>Subir más imágenes</span>
+              </div>
+            )}
+          </div>
+          <div className="lftr">
+            {[['POSTED',posted.size],['EN FEED',filled],['DONE',`${pct}%`]].map(([l,v])=>(
+              <div key={l} className="lstat"><div className="lstat-v">{v}</div><div className="lstat-l">{l}</div></div>
+            ))}
+          </div>
+        </div>
+
+        {/* Phone area */}
+        <div className="sf-pa">
+          <PillarBar ap={ap} setAp={setAp} slots={fs.slots}/>
+          <div className="sf-ps">
+            <div style={{transform:`scale(${zoom})`,transformOrigin:'top center',flexShrink:0}}>
+              <div className="phone-f">
+                <div className="phone-sc">
+                  <div className="ph-sb"><div className="ph-di"/></div>
+                  <div className="ph-is">
+                    <Profile profile={profile} onEdit={()=>setShowEditProfile(true)}/>
+                    <div className="feed-g">
+                      {fs.slots.map(s=>(
+                        <Slot key={s.id} slot={s} assets={fs.assets} dispatch={dispatch} ap={ap} setActive={setActiveSlot} ratio={ratio}/>
+                      ))}
+                    </div>
+                  </div>
+                  {activeSlotObj&&activeAsset&&(
+                    <SlotDetail
+                      key={activeSlotObj.id}
+                      slot={activeSlotObj}
+                      asset={activeAsset}
+                      dark={dark}
+                      onClose={()=>setActiveSlot(null)}
+                      onSave={({status,postDate,postTime,cols,rows})=>dispatch({t:'SET_META',sid:activeSlotObj.id,status,postDate,postTime,cols,rows})}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
