@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Social Feed HTML build artifacts (keep only feed-planner.html)
+Social Feed HTML/_next/
+Social Feed HTML/*.txt
+Social Feed HTML/_not-found/
+Social Feed HTML/404.html
+Social Feed HTML/_not-found.html
+Social Feed HTML/index.html
+Social Feed HTML/index.txt
