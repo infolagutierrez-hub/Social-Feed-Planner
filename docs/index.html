@@ -68,6 +68,10 @@ body{background:#E8E8E6;display:flex;align-items:flex-start;justify-content:cent
 .ibt{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:0.5px solid var(--sfbr);background:transparent;cursor:pointer;color:var(--sft2);font-size:13px;transition:background 0.1s}
 .ibt:hover{background:var(--sfe)}
 .ibt:disabled{opacity:0.3;cursor:default}
+.save-btn{display:flex;align-items:center;gap:4px;padding:0 10px;height:28px;border-radius:6px;border:0.5px solid var(--sfbr);background:transparent;cursor:pointer;color:var(--sft2);font-size:10px;font-weight:700;transition:background 0.15s,color 0.15s;white-space:nowrap}
+.save-btn:hover{background:var(--sfe)}
+.save-btn.flash{background:#22C55E;color:#fff;border-color:#22C55E}
+.save-ts{font-size:9px;font-weight:400;opacity:0.7}
 .zbts{display:flex;align-items:center;border-radius:6px;border:0.5px solid var(--sfbr);overflow:hidden}
 .zbts button{width:26px;height:28px;border:none;background:transparent;cursor:pointer;color:var(--sft2);font-size:14px;display:flex;align-items:center;justify-content:center}
 .zbts button:hover{background:var(--sfe)}
@@ -293,11 +297,25 @@ function fmtDate(d){
 function red(st,a){
   const snap=()=>[...st.past.slice(-39),{assets:st.assets,slots:st.slots}];
   switch(a.t){
-    case'INS':return{...st,past:snap(),fut:[],slots:st.slots.map(s=>{
-      if(s.id===a.sid)return{...s,aid:a.aid};
-      if(s.aid===a.aid)return{...s,aid:null,status:null,postDate:null,postTime:null};
-      return s;
-    })};
+    case'INS':{
+      const idx=st.slots.findIndex(s=>s.id===a.sid);
+      if(idx<0)return st;
+      // Remove asset from its current slot first
+      const base=st.slots.map(s=>s.aid===a.aid?{...s,aid:null,status:null,postDate:null,postTime:null}:s);
+      if(!base[idx].aid){
+        // Target is empty: simple place
+        return{...st,past:snap(),fut:[],slots:base.map((s,i)=>i===idx?{...s,aid:a.aid}:s)};
+      }
+      // Target occupied: push existing content down to next empty slot
+      const r=base.map(s=>({...s}));
+      let carry={aid:r[idx].aid,status:r[idx].status,postDate:r[idx].postDate,postTime:r[idx].postTime};
+      r[idx]={...r[idx],aid:a.aid,status:null,postDate:null,postTime:null};
+      for(let i=idx+1;i<r.length&&carry;i++){
+        if(!r[i].aid){r[i]={...r[i],...carry};carry=null;}
+        else{const nx={aid:r[i].aid,status:r[i].status,postDate:r[i].postDate,postTime:r[i].postTime};r[i]={...r[i],...carry};carry=nx;}
+      }
+      return{...st,past:snap(),fut:[],slots:r};
+    }
     case'REM':return{...st,past:snap(),fut:[],slots:st.slots.map(s=>s.id===a.sid?{...s,aid:null,status:null,postDate:null,postTime:null}:s)};
     case'SWP':{
       const aa=st.slots.find(s=>s.id===a.a),bb=st.slots.find(s=>s.id===a.b);
@@ -701,6 +719,26 @@ function App(){
   const[showEditProfile,setShowEditProfile]=useState(false);
   const[profile,setProfile]=useState(loadProfile);
   const fileRef=useRef();
+  const[lastSaved,setLastSaved]=useState(null);
+  const[saveFlash,setSaveFlash]=useState(false);
+  const fsRef=useRef(fs);
+  const profileRef=useRef(profile);
+  useEffect(()=>{fsRef.current=fs;},[fs]);
+  useEffect(()=>{profileRef.current=profile;},[profile]);
+
+  function saveNow(silent){
+    try{
+      localStorage.setItem(LS_FS,JSON.stringify({assets:fsRef.current.assets,slots:fsRef.current.slots}));
+      localStorage.setItem(LS_PROF,JSON.stringify(profileRef.current));
+    }catch(e){}
+    setLastSaved(new Date());
+    if(!silent){setSaveFlash(true);setTimeout(()=>setSaveFlash(false),1800);}
+  }
+
+  useEffect(()=>{
+    const id=setInterval(()=>saveNow(false),5*60*1000);
+    return()=>clearInterval(id);
+  },[]);
 
   const posted=new Set(fs.slots.filter(s=>s.status==='published'&&s.aid).map(s=>s.aid));
   const inFeed=new Set(fs.slots.map(s=>s.aid).filter(Boolean));
@@ -797,7 +835,10 @@ function App(){
             <button className={ratio==='4:3'?'on':''} onClick={()=>setRatio('4:3')}>4:3</button>
           </div>
           <button className="ibt" onClick={()=>setDark(d=>!d)}>{dark?'☀':'🌙'}</button>
-          <button className="ibt" onClick={()=>dispatch({t:'RST'})} style={{fontSize:14}}>↺</button>
+          <button className={`save-btn${saveFlash?' flash':''}`} onClick={()=>saveNow(false)} title="Guardar ahora">
+            {saveFlash?'✓ Guardado':'💾 Guardar'}
+            {lastSaved&&!saveFlash&&<span className="save-ts">{lastSaved.toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'})}</span>}
+          </button>
         </div>
       </div>
 
