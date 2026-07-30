@@ -82,12 +82,9 @@ body{background:#E8E8E6;display:flex;align-items:flex-start;justify-content:cent
 .slot-detail{background:#fff;border-radius:16px;width:240px;overflow:hidden;box-shadow:0 -4px 32px rgba(0,0,0,0.3)}
 .slot-detail-img{width:100%;height:100px;object-fit:cover;display:block}
 .slot-detail-body{padding:12px}
-/* Status toggle */
-.status-toggle{display:flex;border-radius:8px;overflow:hidden;border:1px solid #E5E5E5;margin-bottom:12px}
-.status-toggle button{flex:1;padding:7px 4px;font-size:10px;font-weight:700;border:none;cursor:pointer;transition:all 0.15s;line-height:1.3}
-.st-posted{background:#22C55E !important;color:#fff !important}
-.st-planned{background:#4F46E5 !important;color:#fff !important}
-.st-inactive{background:#F9FAFB;color:#9CA3AF}
+/* Status 3-way */
+.status-3{display:flex;gap:6px;margin-bottom:12px}
+.s3-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 4px;border-radius:8px;border:1.5px solid;cursor:pointer;font-size:9px;font-weight:700;transition:all 0.15s;line-height:1.3;font-family:inherit}
 /* Calendar */
 .cal-section{margin-bottom:10px}
 .cal-section-label{font-size:9px;font-weight:700;color:#9CA3AF;letter-spacing:0.07em;text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
@@ -111,17 +108,7 @@ body{background:#E8E8E6;display:flex;align-items:flex-start;justify-content:cent
 .time-row input:focus{border-color:#4F46E5}
 .clear-btn{font-size:9px;color:#D1D5DB;background:none;border:none;cursor:pointer;padding:0;white-space:nowrap}
 .clear-btn:hover{color:#EF4444}
-/* Size picker */
-.size-picker{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:12px}
-.size-btn{border:1.5px solid #E5E5E5;background:#F9FAFB;border-radius:7px;cursor:pointer;padding:6px 4px 4px;display:flex;flex-direction:column;align-items:center;gap:3px}
-.size-btn:hover{border-color:#A5B4FC}
-.size-btn.on{border-color:#4F46E5;background:#EEF2FF}
-.size-icon{display:grid;grid-template-columns:1fr 1fr;gap:2px;width:26px;height:26px}
-.size-icon .sc{border-radius:2px;background:#D1D5DB}
-.size-btn.on .size-icon .sc{background:#4F46E5}
-.size-btn.on .size-icon .sc.dim{background:#C7D2FE}
-.size-lbl{font-size:8px;color:#9CA3AF;font-weight:700;letter-spacing:0.03em}
-.size-btn.on .size-lbl{color:#4F46E5}
+
 .slot-detail-ft{display:flex;gap:6px;margin-top:12px}
 .slot-detail-ft button{flex:1;padding:8px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;border:none}
 .btn-save{background:#4F46E5;color:#fff}
@@ -190,8 +177,7 @@ body{background:#E8E8E6;display:flex;align-items:flex-start;justify-content:cent
 .dk .fslot,.dk .fslot .emp{background:#111}
 .dk .fslot.ov .emp{background:#1E1B4B}
 .dk .slot-detail{background:#1E1E1E}
-.dk .status-toggle{border-color:#333}
-.dk .st-inactive{background:#2A2A2A;color:#555}
+.dk .s3-btn{background:transparent !important}
 .dk .cal{background:#2A2A2A;border-color:#333}
 .dk .cal-hd{background:#1E1E1E;border-color:#333}
 .dk .cal-hd-title{color:#E5E5E5}
@@ -200,11 +186,7 @@ body{background:#E8E8E6;display:flex;align-items:flex-start;justify-content:cent
 .dk .cal-day.past:not(.sel){color:#444}
 .dk .time-row input{background:#2A2A2A;border-color:#444;color:#E5E5E5}
 .dk .btn-close-sd{background:#333;color:#ccc}
-.dk .size-btn{border-color:#333;background:#2A2A2A}
-.dk .size-btn:hover{border-color:#6366F1}
-.dk .size-btn.on{border-color:#4F46E5;background:#1E1B4B}
-.dk .size-lbl{color:#555}
-.dk .size-btn.on .size-lbl{color:#818CF8}
+
 .dk .upc,.dk .ep-card{background:#1E1E1E}
 .dk .upc-hd,.dk .ep-hd,.dk .upc-ft,.dk .ep-ft{border-color:#333}
 .dk .upc-hd h3,.dk .ep-hd h3{color:#F0F0F0}
@@ -408,78 +390,55 @@ function Calendar({value,onChange}){
   );
 }
 
-/* ── Slot detail popup ── */
-const SIZES=[
-  {cols:1,rows:1,lbl:'1×1',grid:[[1,0],[0,0]]},
-  {cols:2,rows:1,lbl:'2×1',grid:[[1,1],[0,0]]},
-  {cols:1,rows:2,lbl:'1×2',grid:[[1,0],[1,0]]},
-  {cols:2,rows:2,lbl:'2×2',grid:[[1,1],[1,1]]},
+const STATUS_OPTS=[
+  {val:'draft',    lbl:'Borrador',    e:'✏️', c:'#6B7280', act:'#6B7280'},
+  {val:'scheduled',lbl:'Programado',  e:'🗓', c:'#4F46E5', act:'#4F46E5'},
+  {val:'published',lbl:'Publicado',   e:'✓',  c:'#22C55E', act:'#22C55E'},
 ];
 
-function SizeIcon({grid,on}){
-  return(
-    <div className="size-icon">
-      {grid.flat().map((filled,i)=>(
-        <div key={i} className={`sc${filled?'':(on?' dim':'')}`}
-          style={{background:filled?(on?'#4F46E5':'#6B7280'):'#E5E5E5'}}/>
-      ))}
-    </div>
-  );
-}
-
+/* ── Slot detail popup ── */
 function SlotDetail({slot,asset,onSave,onClose,dark}){
-  const[status,setStatus]=useState(slot.status||null);
+  // migrate old status values
+  const initStatus=slot.status==='posted'?'published':slot.status==='planned'?'scheduled':slot.status||null;
+  const[status,setStatus]=useState(initStatus);
   const[date,setDate]=useState(slot.postDate||'');
   const[time,setTime]=useState(slot.postTime||'');
-  const[cols,setCols]=useState(slot.cols||1);
-  const[rows,setRows]=useState(slot.rows||1);
-
-  function toggleStatus(val){
-    setStatus(s=>s===val?null:val);
-  }
 
   function save(){
-    onSave({status,postDate:date||null,postTime:time||null,cols,rows});
+    onSave({status,postDate:date||null,postTime:time||null,cols:slot.cols||1,rows:slot.rows||1});
     onClose();
   }
+
+  const dateLabel=status==='published'?'Fecha de publicación':status==='scheduled'?'Fecha programada':'Fecha';
 
   return(
     <div className="ph-overlay" onClick={onClose}>
       <div className={`slot-detail${dark?' dk':''}`} onClick={e=>e.stopPropagation()}>
-        {asset&&<img className="slot-detail-img" src={asset.url} alt=""/>}
+        {asset&&<img className="slot-detail-img" src={asset.url} alt="" draggable={false}/>}
         <div className="slot-detail-body">
 
-          {/* Size picker */}
-          <div className="cal-section-label" style={{marginBottom:6}}><span>Tamaño</span></div>
-          <div className="size-picker">
-            {SIZES.map(sz=>{
-              const on=cols===sz.cols&&rows===sz.rows;
+          {/* Status 3-way */}
+          <div className="cal-section-label" style={{marginBottom:6}}><span>Estado</span></div>
+          <div className="status-3">
+            {STATUS_OPTS.map(o=>{
+              const on=status===o.val;
               return(
-                <button key={sz.lbl} className={`size-btn${on?' on':''}`}
-                  onClick={()=>{setCols(sz.cols);setRows(sz.rows);}}>
-                  <SizeIcon grid={sz.grid} on={on}/>
-                  <span className="size-lbl">{sz.lbl}</span>
+                <button key={o.val}
+                  className="s3-btn"
+                  style={{background:on?o.act:'transparent',color:on?'#fff':o.c,borderColor:on?o.act:o.c+'55'}}
+                  onClick={()=>setStatus(s=>s===o.val?null:o.val)}
+                >
+                  <span style={{fontSize:13}}>{o.e}</span>
+                  <span>{o.lbl}</span>
                 </button>
               );
             })}
           </div>
 
-          {/* Status */}
-          <div className="status-toggle">
-            <button
-              className={status==='posted'?'st-posted':'st-inactive'}
-              onClick={()=>toggleStatus('posted')}
-            >✓ Publicado</button>
-            <button
-              className={status==='planned'?'st-planned':'st-inactive'}
-              onClick={()=>toggleStatus('planned')}
-            >🗓 Planificado</button>
-          </div>
-
           {/* Calendar */}
           <div className="cal-section">
             <div className="cal-section-label">
-              <span>{status==='posted'?'Fecha de publicación':'Fecha planificada'}</span>
+              <span>{dateLabel}</span>
               {date&&<button className="clear-btn" onClick={()=>{setDate('');setTime('');}}>Limpiar ×</button>}
             </div>
             <Calendar value={date} onChange={setDate}/>
@@ -506,7 +465,7 @@ function Slot({slot,assets,dispatch,ap,setActive,ratio}){
   const asset=slot.aid?assets.find(a=>a.id===slot.aid):null;
   const pillar=slot.pid?PILLARS.find(p=>p.id===slot.pid):null;
   const ct=asset?CT[asset.ct]:null;
-  const statusColor=slot.status==='posted'?'#22C55E':slot.status==='planned'?'#4F46E5':null;
+  const statusColor=slot.status==='published'?'#22C55E':slot.status==='scheduled'?'#4F46E5':slot.status==='draft'?'#9CA3AF':null;
   const showMeta=asset&&(slot.postDate||statusColor);
   const c=slot.cols||1;
   const r=slot.rows||1;
@@ -538,7 +497,7 @@ function Slot({slot,assets,dispatch,ap,setActive,ratio}){
     >
       {asset?(
         <>
-          <img className="slot-img" src={asset.url} alt="" loading="lazy"/>
+          <img className="slot-img" src={asset.url} alt="" loading="lazy" draggable={false}/>
           {ap&&slot.pid!==ap&&<div className="dim-ov"/>}
           {ct&&<div className="rib" style={{background:ct.bg}}><span>{ct.e}</span></div>}
           {pillar&&<div className="pbadge" style={{background:pillar.c}}><span>{pillar.e}</span><span>{pillar.sl}</span></div>}
@@ -743,7 +702,7 @@ function App(){
   const[profile,setProfile]=useState(loadProfile);
   const fileRef=useRef();
 
-  const posted=new Set(fs.slots.filter(s=>s.status==='posted'&&s.aid).map(s=>s.aid));
+  const posted=new Set(fs.slots.filter(s=>s.status==='published'&&s.aid).map(s=>s.aid));
   const inFeed=new Set(fs.slots.map(s=>s.aid).filter(Boolean));
   const unpostedCount=fs.assets.filter(a=>!inFeed.has(a.id)).length;
   const filled=fs.slots.filter(s=>s.aid).length;
