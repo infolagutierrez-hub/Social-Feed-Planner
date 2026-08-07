@@ -31,6 +31,9 @@ body{background:#E8E8E6;display:flex;align-items:flex-start;justify-content:cent
 .fslot.has-a{cursor:pointer}
 .fslot.ov{outline:2px solid #4F46E5;outline-offset:-2px}
 .fslot img.slot-img{width:100%;height:100%;object-fit:cover;display:block}
+.slot-x{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.6);border:none;cursor:pointer;color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.15s;z-index:12;line-height:1;padding:0}
+.fslot:hover .slot-x{opacity:1}
+.slot-x:hover{background:rgba(220,38,38,0.85)}
 .fslot .emp{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#F5F4F2;transition:background 0.12s}
 .fslot.ov .emp{background:#E8E6FF}
 .rib{position:absolute;top:0;right:0;width:22px;height:28px;display:flex;align-items:flex-start;justify-content:center;padding-top:2px;z-index:15;pointer-events:none;clip-path:polygon(0 0,100% 0,100% 85%,50% 100%,0 85%);font-size:9px}
@@ -317,6 +320,21 @@ function red(st,a){
       return{...st,past:snap(),fut:[],slots:r};
     }
     case'REM':return{...st,past:snap(),fut:[],slots:st.slots.map(s=>s.id===a.sid?{...s,aid:null,status:null,postDate:null,postTime:null}:s)};
+    case'REM_COMPACT':{
+      const idx=st.slots.findIndex(s=>s.id===a.sid);
+      if(idx<0||!st.slots[idx].aid)return st;
+      const slots=st.slots.map(s=>({...s}));
+      // Collect all non-empty slot data after idx
+      const tail=[];
+      for(let i=idx+1;i<slots.length;i++){
+        if(slots[i].aid)tail.push({aid:slots[i].aid,status:slots[i].status,postDate:slots[i].postDate,postTime:slots[i].postTime});
+      }
+      // Clear from idx onwards
+      for(let i=idx;i<slots.length;i++){slots[i]={...slots[i],aid:null,status:null,postDate:null,postTime:null};}
+      // Re-fill compacted
+      tail.forEach((d,i)=>{slots[idx+i]={...slots[idx+i],...d};});
+      return{...st,past:snap(),fut:[],slots};
+    }
     case'SWP':{
       const aa=st.slots.find(s=>s.id===a.a),bb=st.slots.find(s=>s.id===a.b);
       return{...st,past:snap(),fut:[],slots:st.slots.map(s=>{
@@ -501,6 +519,7 @@ function Slot({slot,assets,dispatch,ap,setActive,ratio}){
       }}
       draggable={!!asset}
       onDragStart={e=>{if(!asset)return;drag={t:'slot',sid:slot.id,aid:slot.aid};e.dataTransfer.effectAllowed='move';}}
+      onDragEnd={()=>{if(drag&&drag.t==='slot'&&drag.sid===slot.id){dispatch({t:'REM_COMPACT',sid:slot.id});drag=null;}}}
       onClick={()=>{
         if(!asset)return;
         if(ap){dispatch({t:'TAG',sid:slot.id,pid:slot.pid===ap?null:ap});}
@@ -526,6 +545,7 @@ function Slot({slot,assets,dispatch,ap,setActive,ratio}){
             </div>
           )}
           <div className="ahov"/>
+          <button className="slot-x" onClick={e=>{e.stopPropagation();dispatch({t:'REM_COMPACT',sid:slot.id});}}>×</button>
         </>
       ):(
         <div className="emp">{ov&&<span style={{fontSize:18,color:'#4F46E5',opacity:0.7}}>+</span>}</div>
