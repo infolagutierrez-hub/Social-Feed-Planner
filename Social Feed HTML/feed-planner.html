@@ -34,6 +34,10 @@ body{background:#E8E8E6;display:flex;align-items:flex-start;justify-content:cent
 .slot-x{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.6);border:none;cursor:pointer;color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.15s;z-index:12;line-height:1;padding:0}
 .fslot:hover .slot-x{opacity:1}
 .slot-x:hover{background:rgba(220,38,38,0.85)}
+.slot-pin{position:absolute;top:4px;right:26px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.6);border:none;cursor:pointer;font-size:9px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.15s,background 0.15s;z-index:16;line-height:1;padding:0}
+.fslot:hover .slot-pin{opacity:1}
+.slot-pin.on{opacity:1;background:rgba(255,255,255,0.92)}
+.slot-pin:hover{background:rgba(79,70,229,0.85)}
 .fslot .emp{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#F5F4F2;transition:background 0.12s}
 .fslot.ov .emp{background:#E8E6FF}
 .rib{position:absolute;top:0;right:0;width:22px;height:28px;display:flex;align-items:flex-start;justify-content:center;padding-top:2px;z-index:15;pointer-events:none;clip-path:polygon(0 0,100% 0,100% 85%,50% 100%,0 85%);font-size:9px}
@@ -74,6 +78,7 @@ body{background:#E8E8E6;display:flex;align-items:flex-start;justify-content:cent
 .save-btn{display:flex;align-items:center;gap:4px;padding:0 10px;height:28px;border-radius:6px;border:0.5px solid var(--sfbr);background:transparent;cursor:pointer;color:var(--sft2);font-size:10px;font-weight:700;transition:background 0.15s,color 0.15s;white-space:nowrap}
 .save-btn:hover{background:var(--sfe)}
 .save-btn.flash{background:#22C55E;color:#fff;border-color:#22C55E}
+.save-btn.err{background:#EF4444;color:#fff;border-color:#EF4444}
 .save-ts{font-size:9px;font-weight:400;opacity:0.7}
 .zbts{display:flex;align-items:center;border-radius:6px;border:0.5px solid var(--sfbr);overflow:hidden}
 .zbts button{width:26px;height:28px;border:none;background:transparent;cursor:pointer;color:var(--sft2);font-size:14px;display:flex;align-items:center;justify-content:center}
@@ -239,7 +244,7 @@ const CT={
 const CT_KEYS=Object.keys(CT);
 const INIT_ASSETS=[];
 const mkSlots=()=>Array.from({length:60},(_,i)=>({
-  id:`s${i+1}`,aid:null,pid:null,status:null,postDate:null,postTime:null,cols:1,rows:1
+  id:`s${i+1}`,aid:null,pid:null,status:null,postDate:null,postTime:null,cols:1,rows:1,pinned:false,pinFrom:null
 }));
 const INIT_SLOTS=mkSlots();
 
@@ -251,6 +256,35 @@ const uid=()=>`u${++uidc}`;
 const LS_FS='sfp_feed';
 const LS_PROF='sfp_profile';
 const DEFAULT_PROFILE={name:'lagutierrez.studio',bio:'Arquitectura de identidad ✦ Worldbuilding creativo · BCN',avatar:null,initials:'L',followers:'12.4k',following:'842'};
+
+/* IndexedDB: localStorage solo admite ~5MB y las imágenes en base64 lo llenan enseguida */
+const IDB_NAME='sfp',IDB_STORE='kv';
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open(IDB_NAME,1);
+    r.onupgradeneeded=()=>r.result.createObjectStore(IDB_STORE);
+    r.onsuccess=()=>res(r.result);
+    r.onerror=()=>rej(r.error);
+  });
+}
+async function idbGet(k){
+  const db=await idbOpen();
+  return new Promise((res,rej)=>{
+    const r=db.transaction(IDB_STORE).objectStore(IDB_STORE).get(k);
+    r.onsuccess=()=>res(r.result);
+    r.onerror=()=>rej(r.error);
+  });
+}
+async function idbSet(entries){
+  const db=await idbOpen();
+  return new Promise((res,rej)=>{
+    const tx=db.transaction(IDB_STORE,'readwrite');
+    const st=tx.objectStore(IDB_STORE);
+    Object.entries(entries).forEach(([k,v])=>st.put(v,k));
+    tx.oncomplete=()=>res();
+    tx.onerror=tx.onabort=()=>rej(tx.error);
+  });
+}
 
 function loadProfile(){
   try{const s=localStorage.getItem(LS_PROF);if(s)return JSON.parse(s);}catch(e){}
@@ -297,29 +331,53 @@ function fmtDate(d){
   return`${dt.getDate()} ${MONTHS_SH[dt.getMonth()]}`;
 }
 
+/* ── Pin: como Instagram, máx. 3 posts fijados arriba del feed ── */
+const MAX_PINS=3;
+const isPinned=s=>!!(s.pinned&&s.aid);
+// Mueve el contenido de la posición `from` a `to`; los ids de slot son posicionales
+function moveSlot(slots,from,to){
+  const c=slots.map(({id,...rest})=>rest);
+  const[it]=c.splice(from,1);
+  c.splice(to,0,it);
+  return c.map((x,i)=>({...x,id:slots[i].id}));
+}
+// Mantiene los fijados siempre al principio, sin alterar el orden del resto
+function pinTop(slots){
+  const n=slots.filter(isPinned).length;
+  if(slots.slice(0,n).every(isPinned))return slots;
+  const c=slots.map(({id,...rest})=>rest);
+  const sorted=[...c.filter(isPinned),...c.filter(x=>!isPinned(x))];
+  return sorted.map((x,i)=>({...x,id:slots[i].id}));
+}
+
 function red(st,a){
+  const n=redBase(st,a);
+  return n.slots!==st.slots?{...n,slots:pinTop(n.slots)}:n;
+}
+
+function redBase(st,a){
   const snap=()=>[...st.past.slice(-39),{assets:st.assets,slots:st.slots}];
   switch(a.t){
     case'INS':{
       const idx=st.slots.findIndex(s=>s.id===a.sid);
       if(idx<0)return st;
       // Remove asset from its current slot first
-      const base=st.slots.map(s=>s.aid===a.aid?{...s,aid:null,status:null,postDate:null,postTime:null}:s);
+      const base=st.slots.map(s=>s.aid===a.aid?{...s,aid:null,status:null,postDate:null,postTime:null,pinned:false,pinFrom:null}:s);
       if(!base[idx].aid){
         // Target is empty: simple place
         return{...st,past:snap(),fut:[],slots:base.map((s,i)=>i===idx?{...s,aid:a.aid}:s)};
       }
       // Target occupied: push existing content down to next empty slot
       const r=base.map(s=>({...s}));
-      let carry={aid:r[idx].aid,status:r[idx].status,postDate:r[idx].postDate,postTime:r[idx].postTime};
-      r[idx]={...r[idx],aid:a.aid,status:null,postDate:null,postTime:null};
+      let carry={aid:r[idx].aid,status:r[idx].status,postDate:r[idx].postDate,postTime:r[idx].postTime,pinned:r[idx].pinned,pinFrom:r[idx].pinFrom};
+      r[idx]={...r[idx],aid:a.aid,status:null,postDate:null,postTime:null,pinned:false,pinFrom:null};
       for(let i=idx+1;i<r.length&&carry;i++){
         if(!r[i].aid){r[i]={...r[i],...carry};carry=null;}
-        else{const nx={aid:r[i].aid,status:r[i].status,postDate:r[i].postDate,postTime:r[i].postTime};r[i]={...r[i],...carry};carry=nx;}
+        else{const nx={aid:r[i].aid,status:r[i].status,postDate:r[i].postDate,postTime:r[i].postTime,pinned:r[i].pinned,pinFrom:r[i].pinFrom};r[i]={...r[i],...carry};carry=nx;}
       }
       return{...st,past:snap(),fut:[],slots:r};
     }
-    case'REM':return{...st,past:snap(),fut:[],slots:st.slots.map(s=>s.id===a.sid?{...s,aid:null,status:null,postDate:null,postTime:null}:s)};
+    case'REM':return{...st,past:snap(),fut:[],slots:st.slots.map(s=>s.id===a.sid?{...s,aid:null,status:null,postDate:null,postTime:null,pinned:false,pinFrom:null}:s)};
     case'REM_COMPACT':{
       const idx=st.slots.findIndex(s=>s.id===a.sid);
       if(idx<0||!st.slots[idx].aid)return st;
@@ -327,10 +385,10 @@ function red(st,a){
       // Collect all non-empty slot data after idx
       const tail=[];
       for(let i=idx+1;i<slots.length;i++){
-        if(slots[i].aid)tail.push({aid:slots[i].aid,status:slots[i].status,postDate:slots[i].postDate,postTime:slots[i].postTime});
+        if(slots[i].aid)tail.push({aid:slots[i].aid,status:slots[i].status,postDate:slots[i].postDate,postTime:slots[i].postTime,pinned:slots[i].pinned,pinFrom:slots[i].pinFrom});
       }
       // Clear from idx onwards
-      for(let i=idx;i<slots.length;i++){slots[i]={...slots[i],aid:null,status:null,postDate:null,postTime:null};}
+      for(let i=idx;i<slots.length;i++){slots[i]={...slots[i],aid:null,status:null,postDate:null,postTime:null,pinned:false,pinFrom:null};}
       // Re-fill compacted
       tail.forEach((d,i)=>{slots[idx+i]={...slots[idx+i],...d};});
       return{...st,past:snap(),fut:[],slots};
@@ -338,20 +396,37 @@ function red(st,a){
     case'SWP':{
       const aa=st.slots.find(s=>s.id===a.a),bb=st.slots.find(s=>s.id===a.b);
       return{...st,past:snap(),fut:[],slots:st.slots.map(s=>{
-        if(s.id===a.a)return{...s,aid:bb?.aid??null,pid:bb?.pid??null,status:bb?.status??null,postDate:bb?.postDate??null,postTime:bb?.postTime??null,cols:bb?.cols??1,rows:bb?.rows??1};
-        if(s.id===a.b)return{...s,aid:aa?.aid??null,pid:aa?.pid??null,status:aa?.status??null,postDate:aa?.postDate??null,postTime:aa?.postTime??null,cols:aa?.cols??1,rows:aa?.rows??1};
+        if(s.id===a.a)return{...s,aid:bb?.aid??null,pid:bb?.pid??null,status:bb?.status??null,postDate:bb?.postDate??null,postTime:bb?.postTime??null,cols:bb?.cols??1,rows:bb?.rows??1,pinned:bb?.pinned??false,pinFrom:bb?.pinFrom??null};
+        if(s.id===a.b)return{...s,aid:aa?.aid??null,pid:aa?.pid??null,status:aa?.status??null,postDate:aa?.postDate??null,postTime:aa?.postTime??null,cols:aa?.cols??1,rows:aa?.rows??1,pinned:aa?.pinned??false,pinFrom:aa?.pinFrom??null};
         return s;
       })};
+    }
+    case'PIN':{
+      const idx=st.slots.findIndex(s=>s.id===a.sid);
+      if(idx<0||!st.slots[idx].aid||st.slots[idx].pinned)return st;
+      const n=st.slots.filter(isPinned).length;
+      if(n>=MAX_PINS)return st;
+      const slots=st.slots.map((s,i)=>i===idx?{...s,pinned:true,pinFrom:idx}:s);
+      return{...st,past:snap(),fut:[],slots:moveSlot(slots,idx,n)};
+    }
+    case'UNPIN':{
+      const idx=st.slots.findIndex(s=>s.id===a.sid);
+      if(idx<0||!st.slots[idx].pinned)return st;
+      const from=st.slots[idx].pinFrom;
+      const slots=st.slots.map((s,i)=>i===idx?{...s,pinned:false,pinFrom:null}:s);
+      const n=slots.filter(isPinned).length;
+      // Vuelve a su sitio original (o justo debajo de los fijados)
+      return{...st,past:snap(),fut:[],slots:moveSlot(slots,idx,Math.max(from??n,n))};
     }
     case'TAG':return{...st,slots:st.slots.map(s=>s.id===a.sid?{...s,pid:a.pid}:s)};
     case'SET_META':return{...st,past:snap(),fut:[],slots:st.slots.map(s=>s.id===a.sid?{...s,status:a.status,postDate:a.postDate,postTime:a.postTime,cols:a.cols||1,rows:a.rows||1}:s)};
     case'ADD_ASSETS':return{...st,assets:[...st.assets,...a.items]};
     case'DEL_ASSET':return{...st,past:snap(),fut:[],
       assets:st.assets.filter(x=>x.id!==a.id),
-      slots:st.slots.map(s=>s.aid===a.id?{...s,aid:null,status:null,postDate:null,postTime:null}:s)};
+      slots:st.slots.map(s=>s.aid===a.id?{...s,aid:null,status:null,postDate:null,postTime:null,pinned:false,pinFrom:null}:s)};
     case'DEL_MULTI':return{...st,past:snap(),fut:[],
       assets:st.assets.filter(x=>!a.ids.includes(x.id)),
-      slots:st.slots.map(s=>a.ids.includes(s.aid)?{...s,aid:null,status:null,postDate:null,postTime:null}:s)};
+      slots:st.slots.map(s=>a.ids.includes(s.aid)?{...s,aid:null,status:null,postDate:null,postTime:null,pinned:false,pinFrom:null}:s)};
     case'UND':{
       if(!st.past.length)return st;
       const p=[...st.past],pv=p.pop();
@@ -361,6 +436,10 @@ function red(st,a){
       if(!st.fut.length)return st;
       const[nx,...f]=st.fut;
       return{...st,past:[...st.past.slice(-39),{assets:st.assets,slots:st.slots}],assets:nx.assets,slots:nx.slots,fut:f};
+    }
+    case'LOAD':{
+      a.assets.forEach(x=>{const n=parseInt((x.id||'').replace('u',''));if(!isNaN(n)&&n>uidc)uidc=n;});
+      return{assets:a.assets,slots:a.slots,past:[],fut:[]};
     }
     case'RST':return{...st,past:snap(),fut:[],slots:mkSlots()};
     default:return st;
@@ -495,7 +574,7 @@ function SlotDetail({slot,asset,onSave,onClose,dark}){
 }
 
 /* ── Slot ── */
-function Slot({slot,assets,dispatch,ap,setActive,ratio}){
+function Slot({slot,assets,dispatch,ap,setActive,ratio,canPin}){
   const[ov,setOv]=useState(false);
   const[pp,setPp]=useState(false);
   const asset=slot.aid?assets.find(a=>a.id===slot.aid):null;
@@ -546,6 +625,12 @@ function Slot({slot,assets,dispatch,ap,setActive,ratio}){
           )}
           <div className="ahov"/>
           <button className="slot-x" onClick={e=>{e.stopPropagation();dispatch({t:'REM_COMPACT',sid:slot.id});}}>×</button>
+          {(slot.pinned||canPin)&&(
+            <button className={`slot-pin${slot.pinned?' on':''}`}
+              title={slot.pinned?'Desfijar':'Fijar arriba del feed'}
+              onClick={e=>{e.stopPropagation();dispatch({t:slot.pinned?'UNPIN':'PIN',sid:slot.id});}}
+            >📌</button>
+          )}
         </>
       ):(
         <div className="emp">{ov&&<span style={{fontSize:18,color:'#4F46E5',opacity:0.7}}>+</span>}</div>
@@ -741,19 +826,43 @@ function App(){
   const fileRef=useRef();
   const[lastSaved,setLastSaved]=useState(null);
   const[saveFlash,setSaveFlash]=useState(false);
+  const[saveErr,setSaveErr]=useState(false);
+  const[loaded,setLoaded]=useState(false);
   const fsRef=useRef(fs);
   const profileRef=useRef(profile);
   useEffect(()=>{fsRef.current=fs;},[fs]);
   useEffect(()=>{profileRef.current=profile;},[profile]);
 
-  function saveNow(silent){
+  async function saveNow(silent){
     try{
-      localStorage.setItem(LS_FS,JSON.stringify({assets:fsRef.current.assets,slots:fsRef.current.slots}));
-      localStorage.setItem(LS_PROF,JSON.stringify(profileRef.current));
-    }catch(e){}
-    setLastSaved(new Date());
-    if(!silent){setSaveFlash(true);setTimeout(()=>setSaveFlash(false),1800);}
+      await idbSet({[LS_FS]:{assets:fsRef.current.assets,slots:fsRef.current.slots},[LS_PROF]:profileRef.current});
+      setSaveErr(false);
+      setLastSaved(new Date());
+      if(!silent){setSaveFlash(true);setTimeout(()=>setSaveFlash(false),1800);}
+    }catch(e){
+      console.error('No se pudo guardar en IndexedDB',e);
+      try{
+        localStorage.setItem(LS_FS,JSON.stringify({assets:fsRef.current.assets,slots:fsRef.current.slots}));
+        localStorage.setItem(LS_PROF,JSON.stringify(profileRef.current));
+        setSaveErr(false);
+        setLastSaved(new Date());
+      }catch(e2){setSaveErr(true);}
+    }
   }
+
+  // Carga desde IndexedDB; si está vacío, migra lo que hubiera en localStorage
+  useEffect(()=>{
+    (async()=>{
+      try{
+        if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
+        const [d,p]=await Promise.all([idbGet(LS_FS),idbGet(LS_PROF)]);
+        if(d)dispatch({t:'LOAD',assets:d.assets||[],slots:d.slots||mkSlots()});
+        if(p)setProfile(p);
+        if(!d)await idbSet({[LS_FS]:{assets:fsRef.current.assets,slots:fsRef.current.slots},[LS_PROF]:profileRef.current});
+      }catch(e){console.error('No se pudo leer IndexedDB',e);}
+      setLoaded(true);
+    })();
+  },[]);
 
   useEffect(()=>{
     const id=setInterval(()=>saveNow(false),5*60*1000);
@@ -764,6 +873,7 @@ function App(){
   const inFeed=new Set(fs.slots.map(s=>s.aid).filter(Boolean));
   const unpostedCount=fs.assets.filter(a=>!inFeed.has(a.id)).length;
   const filled=fs.slots.filter(s=>s.aid).length;
+  const pinCount=fs.slots.filter(isPinned).length;
   const pct=Math.round(filled/60*100);
 
   const activeSlotObj=activeSlot?fs.slots.find(s=>s.id===activeSlot):null;
@@ -810,12 +920,8 @@ function App(){
   }
 
   useEffect(()=>{
-    try{localStorage.setItem(LS_FS,JSON.stringify({assets:fs.assets,slots:fs.slots}));}catch(e){}
-  },[fs.assets,fs.slots]);
-
-  useEffect(()=>{
-    try{localStorage.setItem(LS_PROF,JSON.stringify(profile));}catch(e){}
-  },[profile]);
+    if(loaded)saveNow(true);
+  },[fs.assets,fs.slots,profile,loaded]);
 
   useEffect(()=>{
     const fn=e=>{
@@ -855,8 +961,8 @@ function App(){
             <button className={ratio==='4:3'?'on':''} onClick={()=>setRatio('4:3')}>4:3</button>
           </div>
           <button className="ibt" onClick={()=>setDark(d=>!d)}>{dark?'☀':'🌙'}</button>
-          <button className={`save-btn${saveFlash?' flash':''}`} onClick={()=>saveNow(false)} title="Guardar ahora">
-            {saveFlash?'✓ Guardado':'💾 Guardar'}
+          <button className={`save-btn${saveFlash?' flash':''}${saveErr?' err':''}`} onClick={()=>saveNow(false)} title={saveErr?'El último guardado falló':'Guardar ahora'}>
+            {saveErr?'⚠ No guardado':saveFlash?'✓ Guardado':'💾 Guardar'}
             {lastSaved&&!saveFlash&&<span className="save-ts">{lastSaved.toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'})}</span>}
           </button>
         </div>
@@ -940,7 +1046,7 @@ function App(){
                     <Profile profile={profile} onEdit={()=>setShowEditProfile(true)}/>
                     <div className="feed-g">
                       {fs.slots.map(s=>(
-                        <Slot key={s.id} slot={s} assets={fs.assets} dispatch={dispatch} ap={ap} setActive={setActiveSlot} ratio={ratio}/>
+                        <Slot key={s.id} slot={s} assets={fs.assets} dispatch={dispatch} ap={ap} setActive={setActiveSlot} ratio={ratio} canPin={pinCount<MAX_PINS}/>
                       ))}
                     </div>
                   </div>
